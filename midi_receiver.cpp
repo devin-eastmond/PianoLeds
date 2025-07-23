@@ -32,11 +32,6 @@ void midiReceiver(KeyStates& keyStates) {
       snd_seq_event_input(seq_handle, &ev);
 
       if (ev->type == SND_SEQ_EVENT_NOTEON || ev->type == SND_SEQ_EVENT_NOTEOFF) {
-          // std::cout << (ev->type == SND_SEQ_EVENT_NOTEON ? "Note On: " : "Note Off: ")
-          //           << "Channel " << (int)ev->data.note.channel
-          //           << ", Note " << (int)ev->data.note.note
-          //           << ", Velocity " << (int)ev->data.note.velocity << std::endl;
-
           State state = ev->data.note.velocity > 0 ? ON : OFF;
           keyStates.setKey(ev->data.note.note - 21, state);
       }

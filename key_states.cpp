@@ -10,7 +10,6 @@ void KeyStates::setKey(int index, State state) {
     if (index >= 0 && index < NUM_KEYS) {
         keys[index] = state;
     }
-    // std::cout << "Key " << index << " set to " << state << std::endl;
 }
 
 State KeyStates::getKey(int index) {
