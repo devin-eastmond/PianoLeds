@@ -73,7 +73,59 @@ void setLeds(int keyIndex, uint32_t color) {
     }
 }
 
-void ledController(KeyStates& keyStates) {
+void playMode(KeyStates& keyStates, std::vector<FadeState>& fadeStates, std::vector<State>& prevState) {
+  std::vector<State> currentState = keyStates.getAllKeys();
+  uint64_t now = millis();
+  bool anyChange = false;
+
+  for (int i = 0; i < std::min((int)currentState.size(), LED_COUNT); ++i) {
+      State prev = prevState[i];
+      State curr = currentState[i];
+
+      // Key pressed → light up immediately
+      if (curr == ON && prev == OFF) {
+          setLeds(i, PRESSED_COLOR);
+          fadeStates[i].transitioning = false;
+          anyChange = true;
+      }
+
+      // Key released → begin fading to RELEASED_COLOR
+      else if (curr == OFF && prev == ON) {
+          fadeStates[i].transitioning = true;
+          fadeStates[i].transitionStart = now;
+      }
+
+      // Handle fading from PRESSED_COLOR to RELEASED_COLOR
+      if (curr == OFF && fadeStates[i].transitioning) {
+          float elapsed = (now - fadeStates[i].transitionStart) / 1000.0f;
+          if (elapsed >= TRANSITION_TIME) {
+              setLeds(i, RELEASED_COLOR);
+              fadeStates[i].transitioning = false;
+              anyChange = true;
+          } else {
+              float factor = powf(elapsed / TRANSITION_TIME, POWER);
+
+              uint8_t r = static_cast<uint8_t>((1.0f - factor) * getRed(PRESSED_COLOR)  + factor * getRed(RELEASED_COLOR));
+              uint8_t g = static_cast<uint8_t>((1.0f - factor) * getGreen(PRESSED_COLOR) + factor * getGreen(RELEASED_COLOR));
+              uint8_t b = static_cast<uint8_t>((1.0f - factor) * getBlue(PRESSED_COLOR)  + factor * getBlue(RELEASED_COLOR));
+
+              setLeds(i, (r << 16) | (g << 8) | b);
+              anyChange = true;
+          }
+      }
+  }
+
+  if (anyChange) {
+      ws2811_render(&ledstring);
+  }
+
+  prevState = currentState;
+  usleep(5000); // ~200 FPS
+}
+
+void ledController(KeyStates& keyStates, ModeManager& modeManager) {
+    ModeType currentMode = modeManager.getMode();
+    bool isNewMode = false;
     std::vector<State> prevState = keyStates.getAllKeys();
     std::vector<FadeState> fadeStates(LED_COUNT);
 
@@ -88,53 +140,31 @@ void ledController(KeyStates& keyStates) {
     ws2811_render(&ledstring);
 
     while (true) {
-        std::vector<State> currentState = keyStates.getAllKeys();
-        uint64_t now = millis();
-        bool anyChange = false;
+        ModeType newMode = modeManager.getMode();
+        if (newMode != currentMode) {
+          currentMode = newMode;
+          isNewMode = true;
+        }
 
-        for (int i = 0; i < std::min((int)currentState.size(), LED_COUNT); ++i) {
-            State prev = prevState[i];
-            State curr = currentState[i];
-
-            // Key pressed → light up immediately
-            if (curr == ON && prev == OFF) {
+        switch (currentMode) {
+          case ModeType::PLAY:
+            playMode(keyStates, fadeStates, prevState);
+            break;
+          case ModeType::SELECT_COLORS:
+            if (isNewMode) {
+              const int halfOfLedMappings = ledMappings.size() / 2;
+              for (int i = 0; i < halfOfLedMappings; i++) {
+                setLeds(i, RELEASED_COLOR);
+              }
+              for (size_t i = static_cast<size_t>(halfOfLedMappings); i < ledMappings.size(); ++i) {
                 setLeds(i, PRESSED_COLOR);
-                fadeStates[i].transitioning = false;
-                anyChange = true;
+              }
+              ws2811_render(&ledstring);
             }
-
-            // Key released → begin fading to RELEASED_COLOR
-            else if (curr == OFF && prev == ON) {
-                fadeStates[i].transitioning = true;
-                fadeStates[i].transitionStart = now;
-            }
-
-            // Handle fading from PRESSED_COLOR to RELEASED_COLOR
-            if (curr == OFF && fadeStates[i].transitioning) {
-                float elapsed = (now - fadeStates[i].transitionStart) / 1000.0f;
-                if (elapsed >= TRANSITION_TIME) {
-                    setLeds(i, RELEASED_COLOR);
-                    fadeStates[i].transitioning = false;
-                    anyChange = true;
-                } else {
-                    float factor = powf(elapsed / TRANSITION_TIME, POWER);
-
-                    uint8_t r = static_cast<uint8_t>((1.0f - factor) * getRed(PRESSED_COLOR)  + factor * getRed(RELEASED_COLOR));
-                    uint8_t g = static_cast<uint8_t>((1.0f - factor) * getGreen(PRESSED_COLOR) + factor * getGreen(RELEASED_COLOR));
-                    uint8_t b = static_cast<uint8_t>((1.0f - factor) * getBlue(PRESSED_COLOR)  + factor * getBlue(RELEASED_COLOR));
-
-                    setLeds(i, (r << 16) | (g << 8) | b);
-                    anyChange = true;
-                }
-            }
+          default:
+            break;
         }
-
-        if (anyChange) {
-            ws2811_render(&ledstring);
-        }
-
-        prevState = currentState;
-        usleep(5000); // ~200 FPS
+        isNewMode = false;
     }
 
     ws2811_fini(&ledstring);

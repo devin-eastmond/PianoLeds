@@ -1,7 +1,7 @@
 # Makefile for compiling led_test.cpp using rpi_ws281x
 
-TARGET = main
-SRC = main.cpp midi_receiver.cpp key_states.cpp led_controller.cpp
+TARGET = piano_leds
+SRC = main.cpp midi_receiver.cpp key_states.cpp led_controller.cpp modes.cpp
 LIB_PATH = rpi_ws281x
 LIBS = $(LIB_PATH)/libws2811.a -lm -lasound
 INCLUDES = -I$(LIB_PATH)

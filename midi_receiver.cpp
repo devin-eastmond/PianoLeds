@@ -2,7 +2,7 @@
 #include <iostream>
 #include <alsa/asoundlib.h>
 
-void midiReceiver(KeyStates& keyStates) {
+void midiReceiver(KeyStates& keyStates, ModeManager& modeManager) {
   snd_seq_t *seq_handle;
   int in_port;
   
@@ -33,7 +33,13 @@ void midiReceiver(KeyStates& keyStates) {
 
       if (ev->type == SND_SEQ_EVENT_NOTEON || ev->type == SND_SEQ_EVENT_NOTEOFF) {
           State state = ev->data.note.velocity > 0 ? ON : OFF;
-          keyStates.setKey(ev->data.note.note - 21, state);
+          int key = ev->data.note.note - 21;
+          keyStates.setKey(key, state);
+          if (state == ON) {
+            modeManager.onKeyPressed(key);
+          } else {
+            modeManager.onKeyReleased(key);
+          }
       }
 
       snd_seq_free_event(ev);

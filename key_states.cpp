@@ -14,7 +14,7 @@ void KeyStates::setKey(int index, State state) {
 
 State KeyStates::getKey(int index) {
     std::lock_guard<std::mutex> lock(mtx);
-    return (index >= 0 && index < keys.size()) ? keys[index] : OFF;
+    return (index >= 0 && static_cast<size_t>(index) < keys.size()) ? keys[index] : OFF;
 }
 
 std::vector<State> KeyStates::getAllKeys() {
